@@ -38,14 +38,31 @@ def main_loop():
             session = manager.get_current_session()
             
             # Send message (handles WAL logging internally)
-            with console.ProgressBar():
-                response = session.send_message(user_input)
+            # Engines that support streaming (local LLaMA) print the answer token by
+            # token; the progress bar is replaced by the first token.
+            streamed = False
+
+            def on_token(piece):
+                nonlocal streamed
+                if not streamed:
+                    bar.stop()
+                    console.stream_start(f"\n{session.assistant_name}: ")
+                    streamed = True
+                console.stream_write(piece)
+
+            with console.ProgressBar() as bar:
+                try:
+                    response = session.send_message(user_input, on_token=on_token)
+                finally:
+                    if streamed:
+                        console.stream_end()
             
             # Get token information
             total_tokens, remaining_tokens, max_tokens = session.get_token_info()
 
-            # Display response
-            console.print_assistant(f"\n{session.assistant_name}: {response.text}")
+            # Display response (already printed while streaming, if the engine supports it)
+            if not streamed:
+                console.print_assistant(f"\n{session.assistant_name}: {response.text}")
             console.print_info(f"Tokens: {total_tokens} (Remaining: {remaining_tokens} / {max_tokens})")
 
             # Save session

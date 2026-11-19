@@ -4,7 +4,7 @@ Encapsulates all local LLaMA model interactions using llama-cpp-python.
 """
 
 import os
-from typing import Optional, List, Any, Dict
+from typing import Optional, List, Any, Dict, Callable
 from llama_cpp import Llama
 from dotenv import load_dotenv
 from cli import console
@@ -29,12 +29,16 @@ class LlamaChatSession:
         self.system_instruction = system_instruction
         self._history = history or []
         
-    def send_message(self, text: str) -> Any:
+    supports_streaming = True
+    
+    def send_message(self, text: str, on_token: Optional[Callable[[str], None]] = None) -> Any:
         """
         Sends a message to the LLaMA model and returns a response object.
         
         Args:
             text: User's message
+            on_token: Optional callback called with each piece of text as the model
+                generates it. When omitted, the whole answer is generated first.
             
         Returns:
             Response object with .text attribute containing the response
@@ -48,12 +52,24 @@ class LlamaChatSession:
         
         try:
             # Generate response using LLaMA
-            output = self.llama_model.create_chat_completion(
-                messages=messages,
-                max_tokens=512,
-            )
-            
-            response_text = output["choices"][0]["message"]["content"].strip()
+            if on_token:
+                pieces = []
+                for chunk in self.llama_model.create_chat_completion(
+                    messages=messages,
+                    max_tokens=512,
+                    stream=True,
+                ):
+                    piece = chunk["choices"][0]["delta"].get("content")
+                    if piece:
+                        pieces.append(piece)
+                        on_token(piece)
+                response_text = "".join(pieces).strip()
+            else:
+                output = self.llama_model.create_chat_completion(
+                    messages=messages,
+                    max_tokens=512,
+                )
+                response_text = output["choices"][0]["message"]["content"].strip()
             
             # Add assistant response to history
             assistant_message = {"role": "model", "parts": [{"text": response_text}]}

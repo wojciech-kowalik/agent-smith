@@ -16,6 +16,7 @@
 - Persistent sessions: every conversation is saved in `~/.smith/` and can be resumed later by ID
 - Two engines behind one interface: Google Gemini (default) and local LLaMA (works offline)
 - Resilient Gemini client: optional proxy, automatic retries, total response timeout and an optional fallback model
+- Streaming output with the local LLaMA engine: the answer appears token by token as the model generates it (Gemini prints the whole answer at once)
 - Token counter after every answer
 - Export of a session to PDF (`/pdf`)
 - Write-ahead log of all prompts and answers (`smith-wal.json`)

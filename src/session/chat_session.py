@@ -107,13 +107,16 @@ class ChatSession:
             self._llm_client.get_model_name()
         )
     
-    def send_message(self, text: str):
+    def send_message(self, text: str, on_token=None):
         """
         Sends a message to the LLM and returns the response.
         Updates internal history automatically and logs to WAL.
         
         Args:
             text: User's message
+            on_token: Optional callback receiving each piece of the answer as it is
+                generated. Only used by engines that support streaming (local LLaMA);
+                ignored otherwise, so the caller must handle the "nothing streamed" case.
             
         Returns:
             Response object from Google GenAI
@@ -121,7 +124,10 @@ class ChatSession:
         if not self._llm_chat_session:
             raise RuntimeError("LLM session not initialized")
         
-        response = self._llm_chat_session.send_message(text)
+        if on_token and getattr(self._llm_chat_session, 'supports_streaming', False):
+            response = self._llm_chat_session.send_message(text, on_token=on_token)
+        else:
+            response = self._llm_chat_session.send_message(text)
         
         # Sync history after message
         self._history = self._llm_chat_session.get_history()

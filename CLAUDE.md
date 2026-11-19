@@ -49,4 +49,3 @@ When something looks wrong, inspect those files and check `.env`.
 - Update `README.md` whenever behavior changes.
 - Follow existing patterns and conventions; keep commit messages focused on the "why".
 - Keep session state encapsulated in classes, not globals.
-- This project was derived from a course project by renaming; use "smith" (not the old name) for any new identifiers, paths and docs.

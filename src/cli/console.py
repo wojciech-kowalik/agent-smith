@@ -61,12 +61,17 @@ class ProgressBar:
             self._thread.start()
         return self
 
-    def __exit__(self, exc_type, exc, tb):
+    def stop(self):
+        """Stop and erase the bar. Safe to call more than once."""
         if self._thread:
             self._stop.set()
             self._thread.join()
             self.clear_line()
             ProgressBar._active = None
+            self._thread = None
+
+    def __exit__(self, exc_type, exc, tb):
+        self.stop()
         return False
 
 
@@ -91,6 +96,24 @@ def print_assistant(message: str):
         message: The assistant message to display
     """
     print(Fore.CYAN + message + Style.RESET_ALL)
+
+
+def stream_start(prefix: str):
+    """Begin a streamed assistant answer: prints the prefix in cyan, no newline."""
+    sys.stdout.write(Fore.CYAN + prefix)
+    sys.stdout.flush()
+
+
+def stream_write(piece: str):
+    """Print one piece of a streamed answer immediately."""
+    sys.stdout.write(piece)
+    sys.stdout.flush()
+
+
+def stream_end():
+    """Finish a streamed answer: reset the color and end the line."""
+    sys.stdout.write(Style.RESET_ALL + "\n")
+    sys.stdout.flush()
 
 
 def print_user(message: str):
