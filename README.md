@@ -1,6 +1,6 @@
-# Smith
+# Agent Smith
 
-> *"Mr. Anderson..."* - Smith is a command-line chat assistant named after the famous Agent.
+> *"Mr. Anderson..."* - Agent Smith is a command-line chat assistant named after the famous Agent from The Matrix.
 
 <p align="center">
   <img src="docs/agent-smith.jpg" alt="Agent Smith mannequin from the Matrix films" width="300">
@@ -8,7 +8,7 @@
   <sub>Agent Smith mannequin from the Matrix films. Photo by <a href="https://commons.wikimedia.org/wiki/File:Smith_Matrix_mannequins_(cropped).jpg">Marcin Wichary</a>, <a href="https://creativecommons.org/licenses/by/2.5/">CC BY 2.5</a>, via Wikimedia Commons.</sub>
 </p>
 
-**Smith** is a Python CLI chat app with persistent sessions. It talks to Google Gemini (cloud) or to a local LLaMA model (GGUF) through one common interface, so you can switch the engine without changing how you use the app.
+**Agent Smith** is a Python CLI chat app with persistent sessions. It talks to Google Gemini (cloud) or to a local LLaMA model (GGUF) through one common interface, so you can switch the engine without changing how you use the app.
 
 ## Features
 
