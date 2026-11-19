@@ -3,7 +3,7 @@
 > *"Mr. Anderson..."* - Smith is a command-line chat assistant named after the famous Agent.
 
 <p align="center">
-  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Smith_Matrix_mannequins_%28cropped%29.jpg/500px-Smith_Matrix_mannequins_%28cropped%29.jpg" alt="Agent Smith mannequin from the Matrix films" width="300">
+  <img src="docs/agent-smith.jpg" alt="Agent Smith mannequin from the Matrix films" width="300">
   <br>
   <sub>Agent Smith mannequin from the Matrix films. Photo by <a href="https://commons.wikimedia.org/wiki/File:Smith_Matrix_mannequins_(cropped).jpg">Marcin Wichary</a>, <a href="https://creativecommons.org/licenses/by/2.5/">CC BY 2.5</a>, via Wikimedia Commons.</sub>
 </p>
