@@ -38,8 +38,7 @@ def main_loop():
             session = manager.get_current_session()
             
             # Send message (handles WAL logging internally)
-            # Engines that support streaming (local LLaMA) print the answer token by
-            # token; the progress bar is replaced by the first token.
+            # The answer is printed token by token; the progress bar is replaced by the first token.
             streamed = False
 
             def on_token(piece):
@@ -60,7 +59,7 @@ def main_loop():
             # Get token information
             total_tokens, remaining_tokens, max_tokens = session.get_token_info()
 
-            # Display response (already printed while streaming, if the engine supports it)
+            # Display response (already printed while streaming; only an empty answer is not)
             if not streamed:
                 console.print_assistant(f"\n{session.assistant_name}: {response.text}")
             console.print_info(f"Tokens: {total_tokens} (Remaining: {remaining_tokens} / {max_tokens})")

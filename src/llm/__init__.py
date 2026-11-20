@@ -1,10 +1,8 @@
 """
-LLM Module Initialization
-Provides LLM client classes for dynamic initialization.
+LLM module: LangChain-based clients for Gemini and local llama.cpp models.
 """
 
-from .gemini_client import GeminiLLMClient
-from .llama_client import LlamaClient
+from .client import LLMClient
+from .factory import create_llm_client
 
-# Export client classes for dynamic initialization
-__all__ = ['GeminiLLMClient', 'LlamaClient']
+__all__ = ['LLMClient', 'create_llm_client']

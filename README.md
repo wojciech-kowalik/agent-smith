@@ -8,7 +8,7 @@
   <sub>Agent Smith mannequin from the Matrix films. Photo by <a href="https://commons.wikimedia.org/wiki/File:Smith_Matrix_mannequins_(cropped).jpg">Marcin Wichary</a>, <a href="https://creativecommons.org/licenses/by/2.5/">CC BY 2.5</a>, via Wikimedia Commons.</sub>
 </p>
 
-**Agent Smith** is a Python CLI chat app with persistent sessions. It talks to Google Gemini (cloud) or to a local LLaMA model (GGUF) through one common interface, so you can switch the engine without changing how you use the app.
+**Agent Smith** is a Python CLI chat app with persistent sessions. It talks to Google Gemini (cloud) or to a local LLaMA model (GGUF) through LangChain chat models behind one common interface, so you can switch the engine without changing how you use the app.
 
 ## Features
 
@@ -16,7 +16,7 @@
 - Persistent sessions: every conversation is saved in `~/.smith/` and can be resumed later by ID
 - Two engines behind one interface: Google Gemini (default) and local LLaMA (works offline)
 - Resilient Gemini client: optional proxy, automatic retries, total response timeout and an optional fallback model
-- Streaming output with the local LLaMA engine: the answer appears token by token as the model generates it (Gemini prints the whole answer at once)
+- Streaming output with both engines: the answer appears token by token as the model generates it
 - Token counter after every answer
 - Export of a session to PDF (`/pdf`)
 - Write-ahead log of all prompts and answers (`smith-wal.json`)
@@ -41,8 +41,10 @@ You get the API key at https://aistudio.google.com/apikey. Type a message and pr
 
 ### dependencies
 
-- `google-genai` - Google Gemini API client
-- `llama-cpp-python` - client for local LLaMA models (GGUF)
+- `langchain-core` - common chat model interface (messages, streaming, fallbacks)
+- `langchain-google-genai` - Google Gemini integration
+- `langchain-community` - `ChatLlamaCpp` integration for local models
+- `llama-cpp-python` - runs local LLaMA models (GGUF)
 - `python-dotenv` - loads environment variables from `.env`
 - `colorama` - colored terminal output
 - `prompt-toolkit` - interactive terminal prompt
@@ -61,7 +63,7 @@ GEMINI_API_KEY=your_gemini_api_key_here
 MODEL_NAME=gemini-3.8-flash # must match an available Gemini model
 GEMINI_PROXY_URL=https://my-proxy.example.com # optional, must start with http:// or https://
 GEMINI_FALLBACK_MODEL=gemini-3.7-flash # optional, used when the main model times out or keeps failing with 5xx errors
-GEMINI_TIMEOUT=30 # optional, max seconds to wait for a whole response incl. retries (default 30)
+GEMINI_TIMEOUT=30 # optional, max seconds to wait for one request to Gemini (default 30)
 ```
 `GEMINI_PROXY_URL` is optional: when set, Gemini API requests are sent to this base URL instead of the default Google endpoint.
 
@@ -75,7 +77,7 @@ LLAMA_GPU_LAYERS=1
 LLAMA_CONTEXT_SIZE=2048
 ```
 
-**Engine selection:** the client is picked from the `ENGINE` variable: `GEMINI` uses `GeminiLLMClient`, `LLAMA_CPP` uses `LlamaClient`.
+**Engine selection:** the client is picked from the `ENGINE` variable: `GEMINI` uses `ChatGoogleGenerativeAI`, `LLAMA_CPP` uses `ChatLlamaCpp` (both created in `src/llm/`).
 
 ### Example: using LLaMA
 
@@ -88,12 +90,21 @@ LLAMA_GPU_LAYERS=1
 LLAMA_CONTEXT_SIZE=2048
 ```
 
-2. Run the application - LlamaClient is used because of `ENGINE=LLAMA_CPP`:
+2. Run the application - the llama.cpp engine is used because of `ENGINE=LLAMA_CPP`:
 ```bash
 python src/run.py
 ```
 
 3. The local model is loaded from `LLAMA_MODEL_PATH`.
+
+## tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+The tests cover the `llm/` layer (history conversion, streaming chat session, token counting, engine selection, Gemini and llama.cpp configuration). They use fake chat models, so they need no API key, network or GGUF file.
 
 ## running
 
@@ -143,7 +154,7 @@ src/
   cli/                   prompt, console output, CLI arguments
   command_handler.py     slash commands (implementations in commands/)
   session/               SessionManager and ChatSession
-  llm/                   GeminiLLMClient, LlamaClient and config validation
+  llm/                   LangChain-based LLMClient, engines (Gemini, llama.cpp), config validation
   assistant/             assistant definition and system prompt
   files/                 config, session files, WAL, PDF export
 ```
@@ -158,7 +169,7 @@ The application uses a two-class session management system:
 Represents one chat session and contains:
 - **Unique session identifier** (`session_id`)
 - **Conversation history** (all messages)
-- **LLM session** (internal Google GenAI object)
+- **LLM session** (`LangChainChatSession`, engine-independent)
 - **Management methods**:
   - `send_message(text)` - sends a message to the model
   - `save_to_file()` / `load_from_file(id)` - persistence
@@ -179,21 +190,25 @@ Manages the session lifecycle and the currently active session:
 
 ### LLM client abstraction
 
-The application supports different LLM model types through a unified interface:
+All model handling goes through LangChain chat models (`BaseChatModel`), so both engines share one code path:
 
-#### **`GeminiLLMClient`** (Google Gemini API)
-- Supports Gemini models through the Google API
+- **`LLMClient`** (`llm/client.py`) - wraps a chat model: creates chat sessions, counts tokens, reports the model name and (for local models) the real context window
+- **`LangChainChatSession`** (`llm/chat_session.py`) - keeps the history and streams every answer with `model.stream()`; the history is updated only after a successful answer, so a failed request can be retried
+- **`llm/history.py`** - converts the stored history format (`{"role": "user|model", "parts": [{"text": ...}]}`) to LangChain messages; existing session files keep working
+- **`llm/factory.py`** - picks the engine from `ENGINE`
+
+#### **Gemini engine** (`llm/gemini.py`, `ChatGoogleGenerativeAI`)
 - Requires an API key (`GEMINI_API_KEY`)
 - Optionally routes requests through a proxy (`GEMINI_PROXY_URL`)
-- Optionally switches to a fallback model (`GEMINI_FALLBACK_MODEL`) when the main model does not finish a response within `GEMINI_TIMEOUT` seconds in total (retries and slow responses included) or still returns a server error (5xx, e.g. 503) after all retries, and prints a notice naming both models; the switch lasts for the rest of that chat session and keeps the history
-- Automatically retries transient errors (HTTP 429/500/502/503/504) up to 5 attempts with exponential backoff
-- Supports Gemini features: thinking budget, structured responses
+- Optionally uses a fallback model (`GEMINI_FALLBACK_MODEL`, via LangChain `with_fallbacks`) when a request to the main model times out (`GEMINI_TIMEOUT` seconds per request) or still returns a server error (5xx, e.g. 503) after all retries; the fallback is tried per request, so the history is kept
+- Automatically retries transient errors up to 5 attempts with exponential backoff
+- Thinking is disabled (`thinking_budget=0`)
+- Tokens are counted with the Gemini token counting API
 
-#### **`LlamaClient`** (local LLaMA models)
-- Supports local GGUF models through llama-cpp-python
-- Requires no internet connection
+#### **llama.cpp engine** (`llm/llama.py`, `ChatLlamaCpp`)
+- Runs local GGUF models through llama-cpp-python, no internet connection needed
 - Configurable parameters: GPU layers, context size (the token counter uses `LLAMA_CONTEXT_SIZE` as its limit)
-- Uses `create_chat_completion`, so the model's built-in chat template (e.g. Llama 3.1's) is applied to the system prompt and history
-- Interface compatible with GeminiLLMClient
+- The model's built-in chat template (e.g. Llama 3.1's) is applied to the system prompt and history
+- Tokens are counted with the model's own tokenizer
 
 **Selection:** `ChatSession` picks the right client from the `ENGINE` environment variable.

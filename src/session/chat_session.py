@@ -1,20 +1,10 @@
 import uuid
-from typing import List, Any, Union
-import os
+from typing import List, Any
 from files import session_files
 from files.wal import append_to_wal
-from llm.gemini_client import GeminiLLMClient
-from llm.llama_client import LlamaClient
+from llm import LLMClient, create_llm_client
 from assistant import Assistant
 from cli import console
-
-# Context token limit
-
-# Engine to Client Class mapping
-ENGINE_MAPPING = {
-    'LLAMA_CPP': LlamaClient,
-    'GEMINI': GeminiLLMClient,
-}
 
 
 class ChatSession:
@@ -35,7 +25,7 @@ class ChatSession:
         self.assistant = assistant
         self.session_id = session_id or str(uuid.uuid4())
         self._history = history or []
-        self._llm_client: Union[GeminiLLMClient, LlamaClient, None] = None
+        self._llm_client: LLMClient | None = None
         self._llm_chat_session = None
         self._max_context_tokens = 32768
         self._initialize_llm_session()
@@ -45,26 +35,18 @@ class ChatSession:
         Creates or recreates the LLM chat session with current history.
         This should be called after any history modification.
         """
-        # Validate the ENGINE variable
-        engine = os.getenv('ENGINE', 'GEMINI').upper()
-        if engine not in ENGINE_MAPPING:
-            valid_engines = ', '.join(ENGINE_MAPPING.keys())
-            raise ValueError(f"ENGINE must be one of: {valid_engines}, got: {engine}")
-        
-        # Initialize LLM client if not already created
+        # Create the LLM client (engine chosen by ENGINE) on first use
         if self._llm_client is None:
-            SelectedClientClass = ENGINE_MAPPING.get(engine, GeminiLLMClient)
-            console.print_info(SelectedClientClass.preparing_for_use_message())
-            self._llm_client = SelectedClientClass.from_environment()
+            self._llm_client = create_llm_client()
             console.print_info(self._llm_client.ready_for_use_message())
             # Local models report their real context window (e.g. LLAMA_CONTEXT_SIZE)
-            if hasattr(self._llm_client, 'get_context_size'):
-                self._max_context_tokens = self._llm_client.get_context_size()
+            context_size = self._llm_client.get_context_size()
+            if context_size:
+                self._max_context_tokens = context_size
         
         self._llm_chat_session = self._llm_client.create_chat_session(
             system_instruction=self.assistant.system_prompt,
-            history=self._history,
-            thinking_budget=0
+            history=self._history
         )
     
     
@@ -114,20 +96,15 @@ class ChatSession:
         
         Args:
             text: User's message
-            on_token: Optional callback receiving each piece of the answer as it is
-                generated. Only used by engines that support streaming (local LLaMA);
-                ignored otherwise, so the caller must handle the "nothing streamed" case.
+            on_token: Optional callback receiving each piece of the answer as it is generated
             
         Returns:
-            Response object from Google GenAI
+            Response object with the full answer in `.text`
         """
         if not self._llm_chat_session:
             raise RuntimeError("LLM session not initialized")
         
-        if on_token and getattr(self._llm_chat_session, 'supports_streaming', False):
-            response = self._llm_chat_session.send_message(text, on_token=on_token)
-        else:
-            response = self._llm_chat_session.send_message(text)
+        response = self._llm_chat_session.send_message(text, on_token=on_token)
         
         # Sync history after message
         self._history = self._llm_chat_session.get_history()

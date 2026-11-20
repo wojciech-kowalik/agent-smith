@@ -12,7 +12,7 @@ python src/run.py                      # new session
 python src/run.py --session-id=<id>    # resume a session
 ```
 
-There is no test suite or linter configured.
+Tests: `pip install -r requirements-dev.txt && pytest` (`tests/`, fake chat models, no API key or GGUF needed). No linter is configured.
 
 ## Architecture
 
@@ -21,7 +21,7 @@ Flow: prompt_toolkit UI → command handler → session manager → chat session
 - `src/run.py` → `src/chat.py`: entry point and main loop (UI in `src/cli/`: `args.py`, `console.py`, `prompt.py`).
 - `src/command_handler.py` + `src/commands/`: slash commands. New commands follow the existing pattern in `commands/`.
 - `src/session/`: `session_manager.py` (session lifecycle and active session), `chat_session.py` (one conversation's history and state).
-- `src/llm/`: `gemini_client.py`, `llama_client.py`, each with a `*_validation.py`. The client is chosen from the model name.
+- `src/llm/`: LangChain-based. `client.py` (`LLMClient`), `chat_session.py` (streaming session), `history.py`, `factory.py` (engine from `ENGINE`), engines `gemini.py` and `llama.py` with `*_validation.py`.
 - `src/assistant/`: assistant definition and system prompt (`assistent.py`, `smith.py`).
 - `src/files/`: `config.py`, `session_files.py`, `wal.py` (write-ahead log).
 - PDF export: `src/pdf.py`, `src/files/pdf/` (bundled Lato fonts).
