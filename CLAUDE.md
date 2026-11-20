@@ -56,5 +56,11 @@ When something looks wrong, inspect those files and check `.env`.
 ## Conventions
 
 - Update `README.md` whenever behavior changes.
-- Follow existing patterns and conventions; keep commit messages focused on the "why". Commit messages follow Conventional Commits (`type(scope): subject`, e.g. `feat(llm): ...`, `docs(readme): ...`).
+- Follow existing patterns and conventions; keep commit messages focused on the "why".
+- Commit messages MUST pass commitlint (`@commitlint/config-conventional`): `type(scope): subject`.
+  - `type`: one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`; lowercase
+  - `scope`: optional, lowercase (e.g. `llm`, `readme`)
+  - `subject`: imperative mood, lowercase start, no trailing period; the whole header at most 100 characters
+  - separate the body and footer from the header with a blank line; body lines at most 100 characters
+  - e.g. `feat(llm): show generation speed in tokens per second`, `docs(readme): sync with the code`
 - Keep session state encapsulated in classes, not globals.
