@@ -15,7 +15,7 @@
 - Interactive prompt with syntax highlighting and auto-completion of slash commands
 - Persistent sessions: every conversation is saved in `~/.smith/` and can be resumed later by ID
 - Two engines behind one interface: Google Gemini (default) and local LLaMA (works offline)
-- Resilient Gemini client: optional proxy, automatic retries, total response timeout and an optional fallback model
+- Resilient Gemini client: optional proxy, automatic retries, per-request timeout and an optional fallback model
 - Streaming output with both engines: the answer appears token by token as the model generates it
 - Token counter after every answer
 - Export of a session to PDF (`/pdf`)
@@ -23,6 +23,12 @@
 - Animated progress bar while waiting for the model
 
 ## Quick start
+
+```bash
+make run                  # creates .venv, installs dependencies and .env, then starts the app
+```
+
+On the first run `make run` creates `.env` from `.env.example`; edit it first (put your `GEMINI_API_KEY` in it) with `make .env`, then `make run`. Without `make`:
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
@@ -33,11 +39,13 @@ python src/run.py
 
 You get the API key at https://aistudio.google.com/apikey. Type a message and press Enter; type `/help` to see the available commands and `/exit` to leave (the session is saved automatically).
 
-# setup/requirements
+## setup/requirements
 
 - create a venv: `python -m venv .venv`
 - activate the venv: `source .venv/bin/activate`
-- install dependencies: `pip install -r requirements.txt`
+- install dependencies: `pip install -r requirements.txt` (`requirements-dev.txt` adds `pytest`)
+
+Or simply `make setup`.
 
 ### dependencies
 
@@ -73,11 +81,12 @@ For local LLaMA models, set:
 ENGINE=LLAMA_CPP
 MODEL_NAME=llama-3.1-8b-instruct
 LLAMA_MODEL_PATH=/path/to/your/model.gguf
-LLAMA_GPU_LAYERS=1
-LLAMA_CONTEXT_SIZE=2048
+LLAMA_GPU_LAYERS=1       # optional, default 1 (use a high number such as 99 to offload everything to the GPU)
+LLAMA_CONTEXT_SIZE=2048  # optional, default 2048
 ```
+`LLAMA_CONTEXT_SIZE` is also the limit shown by the token counter. A bigger context needs more memory (the KV cache grows with it); if the model fails to load with `Failed to create llama_context`, lower it or reduce `LLAMA_GPU_LAYERS`. For Gemini the counter assumes a 32768-token limit.
 
-**Engine selection:** the client is picked from the `ENGINE` variable: `GEMINI` uses `ChatGoogleGenerativeAI`, `LLAMA_CPP` uses `ChatLlamaCpp` (both created in `src/llm/`).
+**Engine selection:** the client is picked from the `ENGINE` variable (case-insensitive): `GEMINI` uses `ChatGoogleGenerativeAI`, `LLAMA_CPP` uses `ChatLlamaCpp` (both created in `src/llm/`).
 
 ### Example: using LLaMA
 
@@ -100,8 +109,7 @@ python src/run.py
 ## tests
 
 ```bash
-pip install -r requirements-dev.txt
-pytest
+make test                              # or: pip install -r requirements-dev.txt && pytest
 ```
 
 GitHub Actions (`.github/workflows/tests.yml`) runs them on every push and pull request.
@@ -120,9 +128,8 @@ make clean               # remove .venv
 
 ## running
 
-- activate the venv: `source .venv/bin/activate`
-- run: `python src/run.py`
-- resume a session: `python src/run.py --session-id=<ID>`
+- run: `make run` (or activate the venv with `source .venv/bin/activate` and run `python src/run.py`)
+- resume a session: `make run SESSION_ID=<ID>` (or `python src/run.py --session-id=<ID>`)
 
 After you send a prompt, an animated progress bar with elapsed time is shown while Smith waits for the model's answer. It is skipped when output is not a terminal (e.g. piped).
 
@@ -156,6 +163,7 @@ Exported PDFs are written to `~/.smith/output/`.
 - Something looks wrong? Inspect the files in `~/.smith/` and check your `.env`.
 - `404 NOT_FOUND` from Gemini: the model name in `MODEL_NAME` is not available for your key (models get retired). List the models your key can use at https://aistudio.google.com.
 - `503 UNAVAILABLE`: the model is overloaded. Smith retries automatically; set `GEMINI_FALLBACK_MODEL` to switch to another model when it keeps failing.
+- `Failed to create llama_context` / `Failed to load model` with LLaMA: not enough memory for the model plus the context. Lower `LLAMA_CONTEXT_SIZE` or `LLAMA_GPU_LAYERS`, or close other programs using the GPU.
 - If a request fails, the chat stays open and you can just send the message again.
 
 ## Project layout
@@ -168,7 +176,11 @@ src/
   session/               SessionManager and ChatSession
   llm/                   LangChain-based LLMClient, engines (Gemini, llama.cpp), config validation
   assistant/             assistant definition and system prompt
-  files/                 config, session files, WAL, PDF export
+  files/                 config, session files, WAL, PDF generation (files/pdf/, bundled Lato fonts)
+  pdf.py                 small demo script for the PDF generator
+tests/                   pytest suite (fake chat models)
+.github/workflows/       CI: runs the tests on every push and PR
+Makefile                 setup, run, test, clean
 ```
 
 ## Architecture
@@ -223,4 +235,4 @@ All model handling goes through LangChain chat models (`BaseChatModel`), so both
 - The model's built-in chat template (e.g. Llama 3.1's) is applied to the system prompt and history
 - Tokens are counted with the model's own tokenizer
 
-**Selection:** `ChatSession` picks the right client from the `ENGINE` environment variable.
+**Selection:** `ChatSession` calls `create_llm_client()` (`llm/factory.py`), which picks the engine from the `ENGINE` environment variable.

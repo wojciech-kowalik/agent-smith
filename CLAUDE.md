@@ -32,13 +32,14 @@ Flow: prompt_toolkit UI → command handler → session manager → chat session
 - `src/llm/`: LangChain-based. `client.py` (`LLMClient`), `chat_session.py` (streaming session), `history.py`, `factory.py` (engine from `ENGINE`), engines `gemini.py` and `llama.py` with `*_validation.py`.
 - `src/assistant/`: assistant definition and system prompt (`assistent.py`, `smith.py`).
 - `src/files/`: `config.py`, `session_files.py`, `wal.py` (write-ahead log).
-- PDF export: `src/pdf.py`, `src/files/pdf/` (bundled Lato fonts).
+- PDF export (`/pdf`): `src/commands/session_to_pdf.py` → `src/files/pdf/pdf.py` (bundled Lato fonts); `src/pdf.py` is only a demo script.
 
 ## Slash commands
 
 ```
-/session list | display | summary | new | clear | pop
+/session list | display | pop | clear | new | remove
 /switch <ID>
+/pdf
 /help
 /exit, /quit
 ```
@@ -48,7 +49,7 @@ Flow: prompt_toolkit UI → command handler → session manager → chat session
 Data lives in `~/.smith/`:
 - `smith-wal.json`: transaction log for all sessions
 - `<session-id>-log.json`: per-session data
-- `output/`: exported files
+- `output/`: exported PDFs (`/pdf`)
 
 When something looks wrong, inspect those files and check `.env`.
 
