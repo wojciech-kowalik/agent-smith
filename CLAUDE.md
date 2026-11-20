@@ -12,7 +12,7 @@ python src/run.py                      # new session
 python src/run.py --session-id=<id>    # resume a session
 ```
 
-Tests: `pip install -r requirements-dev.txt && pytest` (`tests/`, fake chat models, no API key or GGUF needed). No linter is configured.
+Tests (also run by GitHub Actions on every push and PR): `pip install -r requirements-dev.txt && pytest` (`tests/`, fake chat models, no API key or GGUF needed). No linter is configured.
 
 ## Architecture
 

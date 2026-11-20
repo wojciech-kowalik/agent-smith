@@ -104,6 +104,8 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
+GitHub Actions (`.github/workflows/tests.yml`) runs them on every push and pull request.
+
 The tests cover the `llm/` layer (history conversion, streaming chat session, token counting, engine selection, Gemini and llama.cpp configuration). They use fake chat models, so they need no API key, network or GGUF file.
 
 ## running
