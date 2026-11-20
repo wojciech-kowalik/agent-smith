@@ -4,15 +4,23 @@ Smith is a Python CLI chat app with persistent sessions. It supports Google Gemi
 
 ## Setup & run
 
+Use the `Makefile` (it manages `.venv`, installs `requirements-dev.txt` once and creates `.env` from `.env.example` if missing):
+
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env   # Gemini: GEMINI_API_KEY, MODEL_NAME; LLaMA: LLAMA_MODEL_PATH + model params
-python src/run.py                      # new session
-python src/run.py --session-id=<id>    # resume a session
+make setup                # create .venv, install dependencies (+ pytest)
+make run                  # new session
+make run SESSION_ID=<id>  # resume a session
+make test                 # run the tests
+make clean                # remove .venv
 ```
 
-Tests (also run by GitHub Actions on every push and PR): `pip install -r requirements-dev.txt && pytest` (`tests/`, fake chat models, no API key or GGUF needed). No linter is configured.
+Manual equivalent: `python -m venv .venv && source .venv/bin/activate && pip install -r requirements-dev.txt`, then `python src/run.py [--session-id=<id>]`.
+
+`.env`: Gemini needs `GEMINI_API_KEY`, `MODEL_NAME`; LLaMA needs `ENGINE=LLAMA_CPP`, `LLAMA_MODEL_PATH` + model params (`LLAMA_GPU_LAYERS`, `LLAMA_CONTEXT_SIZE`; a bigger context needs more VRAM, the cache grows with it).
+
+## Tests & CI
+
+`pytest` (`tests/`, config in `pytest.ini`) uses fake chat models, so no API key or GGUF file is needed. GitHub Actions (`.github/workflows/tests.yml`) runs it on every push and PR (without `llama-cpp-python`, which compiles from source). `main` requires the `pytest` check to pass before merging. No linter is configured.
 
 ## Architecture
 
@@ -47,5 +55,5 @@ When something looks wrong, inspect those files and check `.env`.
 ## Conventions
 
 - Update `README.md` whenever behavior changes.
-- Follow existing patterns and conventions; keep commit messages focused on the "why".
+- Follow existing patterns and conventions; keep commit messages focused on the "why". Commit messages follow Conventional Commits (`type(scope): subject`, e.g. `feat(llm): ...`, `docs(readme): ...`).
 - Keep session state encapsulated in classes, not globals.

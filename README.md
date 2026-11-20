@@ -108,6 +108,16 @@ GitHub Actions (`.github/workflows/tests.yml`) runs them on every push and pull 
 
 The tests cover the `llm/` layer (history conversion, streaming chat session, token counting, engine selection, Gemini and llama.cpp configuration). They use fake chat models, so they need no API key, network or GGUF file.
 
+## make
+
+```bash
+make setup               # create .venv and install dependencies
+make run                 # start Agent Smith (creates .env from .env.example if missing)
+make run SESSION_ID=<id> # resume a session
+make test                # run the tests
+make clean               # remove .venv
+```
+
 ## running
 
 - activate the venv: `source .venv/bin/activate`
