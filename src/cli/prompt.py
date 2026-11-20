@@ -9,6 +9,7 @@ from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import completion_is_selected
+from cli.console import PROMPT_TEXT_COLOR
 
 # --- Configuration ---
 SLASH_COMMANDS = ('/exit', '/quit', '/switch', '/help', '/session')
@@ -62,7 +63,7 @@ class SlashCommandLexer(Lexer):
 _prompt_style = Style.from_dict({
     'slash-command': '#ff0066 bold',
     'subcommand': '#00ff00 bold',
-    'normal-text': '#aaaaaa',
+    'normal-text': PROMPT_TEXT_COLOR,
 })
 
 # Nested auto-completion for slash commands with subcommands

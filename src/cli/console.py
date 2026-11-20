@@ -10,6 +10,15 @@ from files.config import LOG_DIR
 
 init(autoreset=True)
 
+# Color of the text typed at the prompt (shared with the prompt style in cli/prompt.py)
+PROMPT_TEXT_COLOR = "#aaaaaa"
+
+
+def _ansi_foreground(hex_color: str) -> str:
+    """ANSI 24-bit foreground escape sequence for a '#rrggbb' color."""
+    red, green, blue = (int(hex_color[i:i + 2], 16) for i in (1, 3, 5))
+    return f"\033[38;2;{red};{green};{blue}m"
+
 
 class ProgressBar:
     """Animated indeterminate progress bar with elapsed time.
@@ -133,6 +142,16 @@ def print_info(message: str):
     """
     _clear_progress()
     print(message)
+
+def print_stats(message: str):
+    """Print a statistics line (tokens, speed) in the same color as the prompt text.
+
+    Args:
+        message: The statistics line to display
+    """
+    _clear_progress()
+    print(_ansi_foreground(PROMPT_TEXT_COLOR) + message + Style.RESET_ALL)
+
 
 def print_warning(message: str):
     """Print a warning message in yellow color.

@@ -42,3 +42,21 @@ def test_runnable_answers_but_model_counts_tokens():
                        token_counter=lambda messages: 7)
     assert client.create_chat_session("sys").send_message("q").text == "from-runnable"
     assert client.count_history_tokens([make_entry("user", "hi")]) == 7
+
+
+def test_answer_tokens_are_not_counted_by_default(make_client):
+    # API engines must not make an extra network call just for the speed statistics
+    calls = []
+    client = make_client("answer", token_counter=lambda m: calls.append(m) or 9)
+    response = client.create_chat_session("sys").send_message("q")
+    assert response.output_tokens is None
+    assert calls == []
+
+
+def test_answer_tokens_are_counted_with_the_token_counter_when_enabled(make_client):
+    seen = []
+    client = make_client("one two", token_counter=lambda m: seen.append([x.content for x in m]) or 9,
+                         count_answer_tokens=True)
+    response = client.create_chat_session("sys").send_message("q")
+    assert response.output_tokens == 9
+    assert seen == [["one two"]]

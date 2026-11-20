@@ -4,7 +4,7 @@ Engine-independent LLM client: a thin wrapper around a LangChain chat model.
 
 from typing import Callable, Dict, List, Optional
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.runnables import Runnable
 from cli import console
 from .chat_session import LangChainChatSession
@@ -19,24 +19,33 @@ class LLMClient:
 
     def __init__(self, model: BaseChatModel, model_name: str, ready_message: str,
                  context_size: Optional[int] = None, runnable: Optional[Runnable] = None,
-                 token_counter: Optional[Callable[[List[BaseMessage]], int]] = None):
+                 token_counter: Optional[Callable[[List[BaseMessage]], int]] = None,
+                 count_answer_tokens: bool = False):
         """
         Args:
             model: The chat model (used for token counting)
             runnable: What actually answers; `model` itself unless it is wrapped
                 (e.g. with fallbacks, which hides the model's token counting)
             token_counter: Overrides the model's own token counting
+            count_answer_tokens: Count the tokens of each answer locally for the speed statistics
+                (for engines that do not report usage in the stream; avoid for API engines,
+                where counting is a network call)
         """
         self.model = model
         self.runnable = runnable or model
         self._token_counter = token_counter or model.get_num_tokens_from_messages
+        self._count_output_tokens = self._count_text_tokens if count_answer_tokens else None
         self.model_name = model_name
         self._ready_message = ready_message
         self._context_size = context_size
 
     def create_chat_session(self, system_instruction: str, history: Optional[List[Dict]] = None) -> LangChainChatSession:
         """Creates a chat session on this model, continuing the given history."""
-        return LangChainChatSession(self.runnable, system_instruction, history)
+        return LangChainChatSession(self.runnable, system_instruction, history,
+                                    count_output_tokens=self._count_output_tokens)
+
+    def _count_text_tokens(self, text: str) -> int:
+        return self._token_counter([AIMessage(content=text)])
 
     def count_history_tokens(self, history: List[Dict]) -> int:
         """Counts tokens of the history with the model's own tokenizer / token counting API."""

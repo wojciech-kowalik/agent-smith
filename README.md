@@ -17,7 +17,7 @@
 - Two engines behind one interface: Google Gemini (default) and local LLaMA (works offline)
 - Resilient Gemini client: optional proxy, automatic retries, per-request timeout and an optional fallback model
 - Streaming output with both engines: the answer appears token by token as the model generates it
-- Token counter after every answer
+- Token counter after every answer, plus the generation speed in tokens per second
 - Export of a session to PDF (`/pdf`)
 - Write-ahead log of all prompts and answers (`smith-wal.json`)
 - Animated progress bar while waiting for the model
@@ -217,7 +217,7 @@ Manages the session lifecycle and the currently active session:
 All model handling goes through LangChain chat models (`BaseChatModel`), so both engines share one code path:
 
 - **`LLMClient`** (`llm/client.py`) - wraps a chat model: creates chat sessions, counts tokens, reports the model name and (for local models) the real context window
-- **`LangChainChatSession`** (`llm/chat_session.py`) - keeps the history and streams every answer with `model.stream()`; the history is updated only after a successful answer, so a failed request can be retried
+- **`LangChainChatSession`** (`llm/chat_session.py`) - keeps the history and streams every answer with `model.stream()`; the history is updated only after a successful answer, so a failed request can be retried. It also measures the generation speed (see below)
 - **`llm/history.py`** - converts the stored history format (`{"role": "user|model", "parts": [{"text": ...}]}`) to LangChain messages; existing session files keep working
 - **`llm/factory.py`** - picks the engine from `ENGINE`
 
@@ -228,11 +228,16 @@ All model handling goes through LangChain chat models (`BaseChatModel`), so both
 - Automatically retries transient errors up to 5 attempts with exponential backoff
 - Thinking is disabled (`thinking_budget=0`)
 - Tokens are counted with the Gemini token counting API
+- The speed uses the output token count reported by Gemini; when it is missing, no speed is shown
 
 #### **llama.cpp engine** (`llm/llama.py`, `ChatLlamaCpp`)
 - Runs local GGUF models through llama-cpp-python, no internet connection needed
 - Configurable parameters: GPU layers, context size (the token counter uses `LLAMA_CONTEXT_SIZE` as its limit)
 - The model's built-in chat template (e.g. Llama 3.1's) is applied to the system prompt and history
-- Tokens are counted with the model's own tokenizer
+- Tokens are counted with the model's own tokenizer, which is also used to count the tokens of each answer for the speed statistics
+
+#### Generation speed
+
+After every answer the app prints a line such as `Speed: 37.8 tokens/s (51 tokens in 1.4s)`. The time is measured from the first to the last streamed piece, so it shows the pure generation speed without the wait for the first token (model loading and prompt processing); an answer that arrives in one piece is timed over the whole request. The line is skipped when the number of generated tokens is unknown. The `Tokens` and `Speed` lines are printed in the same grey as the text you type at the prompt (`PROMPT_TEXT_COLOR` in `cli/console.py`).
 
 **Selection:** `ChatSession` calls `create_llm_client()` (`llm/factory.py`), which picks the engine from the `ENGINE` environment variable.

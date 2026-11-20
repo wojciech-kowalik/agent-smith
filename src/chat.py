@@ -62,7 +62,12 @@ def main_loop():
             # Display response (already printed while streaming; only an empty answer is not)
             if not streamed:
                 console.print_assistant(f"\n{session.assistant_name}: {response.text}")
-            console.print_info(f"Tokens: {total_tokens} (Remaining: {remaining_tokens} / {max_tokens})")
+            console.print_stats(f"Tokens: {total_tokens} (Remaining: {remaining_tokens} / {max_tokens})")
+            if response.tokens_per_second:
+                console.print_stats(
+                    f"Speed: {response.tokens_per_second:.1f} tokens/s "
+                    f"({response.output_tokens} tokens in {response.generation_seconds:.1f}s)"
+                )
 
             # Save session
             success, error = session.save_to_file()

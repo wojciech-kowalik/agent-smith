@@ -47,4 +47,5 @@ def create_llama_client() -> LLMClient:
 
     ready = (f"✅ llama.cpp client ready to use (local model: {config.model_name}, "
              f"GPU layers: {config.llama_gpu_layers}, Context: {config.llama_context_size})")
-    return LLMClient(model, config.model_name, ready, context_size=config.llama_context_size, token_counter=count_tokens)
+    return LLMClient(model, config.model_name, ready, context_size=config.llama_context_size, token_counter=count_tokens,
+                     count_answer_tokens=True)

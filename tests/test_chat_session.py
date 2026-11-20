@@ -57,3 +57,110 @@ def test_failed_call_leaves_history_unchanged(make_client):
     with pytest.raises(Exception):
         session.send_message("q")
     assert session.get_history() == []
+
+
+def test_response_has_no_speed_when_tokens_unknown(make_client):
+    response = make_client("some answer").create_chat_session("sys").send_message("q")
+    assert response.output_tokens is None
+    assert response.tokens_per_second is None
+
+
+def test_tokens_counted_locally_give_speed(make_client):
+    client = make_client("Hello there friend", token_counter=lambda messages: 30, count_answer_tokens=True)
+    response = client.create_chat_session("sys").send_message("q")
+    assert response.output_tokens == 30
+    assert response.generation_seconds > 0
+    assert response.tokens_per_second == 30 / response.generation_seconds
+
+
+def test_reported_usage_is_preferred_over_local_counting():
+    from langchain_core.messages import AIMessageChunk
+    from langchain_core.runnables import RunnableLambda
+
+    def stream(_messages):
+        yield AIMessageChunk(content="Hi ")
+        yield AIMessageChunk(content="there", usage_metadata={"input_tokens": 5, "output_tokens": 9, "total_tokens": 14})
+
+    model = RunnableLambda(lambda m: None)
+    model.stream = lambda messages: stream(messages)
+    session = LangChainChatSession(model, "sys", count_output_tokens=lambda text: 1)
+    assert session.send_message("q").output_tokens == 9
+
+
+def test_speed_statistics_do_not_break_empty_answers():
+    from langchain_core.messages import AIMessageChunk
+    from langchain_core.runnables import RunnableLambda
+
+    model = RunnableLambda(lambda m: None)
+    model.stream = lambda messages: iter([AIMessageChunk(content="")])
+    response = LangChainChatSession(model, "sys", count_output_tokens=lambda t: 1).send_message("q")
+    assert response.text == ""
+    assert response.tokens_per_second is None
+
+
+class FakeClock:
+    """Replaces time.perf_counter: every call advances the clock by `step` seconds."""
+
+    def __init__(self, step=1.0):
+        self.now, self.step = 0.0, step
+
+    def __call__(self):
+        self.now += self.step
+        return self.now
+
+
+def _streaming_model(*chunks):
+    from langchain_core.messages import AIMessageChunk
+    from langchain_core.runnables import RunnableLambda
+
+    model = RunnableLambda(lambda m: None)
+    model.stream = lambda messages: iter([AIMessageChunk(content=c) for c in chunks])
+    return model
+
+
+def test_generation_time_runs_from_first_to_last_piece(monkeypatch):
+    # perf_counter calls: start=1, piece1=2, piece2=3, piece3=4 -> generation 4 - 2 = 2s
+    monkeypatch.setattr("llm.chat_session.time.perf_counter", FakeClock())
+    session = LangChainChatSession(_streaming_model("a", "b", "c"), "sys", count_output_tokens=lambda t: 6)
+    response = session.send_message("q")
+    assert response.generation_seconds == 2.0
+    assert response.tokens_per_second == 3.0
+
+
+def test_single_piece_is_timed_over_the_whole_request(monkeypatch):
+    # start=1, piece=2 -> 1s from the start of the request
+    monkeypatch.setattr("llm.chat_session.time.perf_counter", FakeClock())
+    session = LangChainChatSession(_streaming_model("whole answer"), "sys", count_output_tokens=lambda t: 4)
+    response = session.send_message("q")
+    assert response.generation_seconds == 1.0
+    assert response.tokens_per_second == 4.0
+
+
+def test_last_reported_usage_wins():
+    from langchain_core.messages import AIMessageChunk
+    from langchain_core.runnables import RunnableLambda
+
+    def usage(n):
+        return {"input_tokens": 1, "output_tokens": n, "total_tokens": 1 + n}
+
+    model = RunnableLambda(lambda m: None)
+    model.stream = lambda messages: iter([
+        AIMessageChunk(content="a", usage_metadata=usage(3)),
+        AIMessageChunk(content="b", usage_metadata=usage(7)),
+    ])
+    assert LangChainChatSession(model, "sys").send_message("q").output_tokens == 7
+
+
+def test_local_counter_receives_the_answer_text():
+    seen = []
+    session = LangChainChatSession(_streaming_model("Hello ", "world"), "sys",
+                                   count_output_tokens=lambda text: seen.append(text) or 2)
+    session.send_message("q")
+    assert seen == ["Hello world"]
+
+
+def test_stats_do_not_change_the_history(make_client):
+    client = make_client("Hello there", token_counter=lambda m: 5, count_answer_tokens=True)
+    session = client.create_chat_session("sys")
+    session.send_message("q")
+    assert session.get_history() == [make_entry("user", "q"), make_entry("model", "Hello there")]

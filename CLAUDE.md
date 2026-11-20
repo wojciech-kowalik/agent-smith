@@ -29,7 +29,7 @@ Flow: prompt_toolkit UI → command handler → session manager → chat session
 - `src/run.py` → `src/chat.py`: entry point and main loop (UI in `src/cli/`: `args.py`, `console.py`, `prompt.py`).
 - `src/command_handler.py` + `src/commands/`: slash commands. New commands follow the existing pattern in `commands/`.
 - `src/session/`: `session_manager.py` (session lifecycle and active session), `chat_session.py` (one conversation's history and state).
-- `src/llm/`: LangChain-based. `client.py` (`LLMClient`), `chat_session.py` (streaming session), `history.py`, `factory.py` (engine from `ENGINE`), engines `gemini.py` and `llama.py` with `*_validation.py`.
+- `src/llm/`: LangChain-based. `client.py` (`LLMClient`), `chat_session.py` (streaming session), `history.py`, `factory.py` (engine from `ENGINE`), engines `gemini.py` and `llama.py` with `*_validation.py`. `send_message` returns an `LLMResponse` (`text`, `output_tokens`, `tokens_per_second`); `chat.py` prints the speed line after each answer. The `Tokens`/`Speed` lines use `console.print_stats`, colored with `PROMPT_TEXT_COLOR` (shared with the prompt style).
 - `src/assistant/`: assistant definition and system prompt (`assistent.py`, `smith.py`).
 - `src/files/`: `config.py`, `session_files.py`, `wal.py` (write-ahead log).
 - PDF export (`/pdf`): `src/commands/session_to_pdf.py` → `src/files/pdf/pdf.py` (bundled Lato fonts); `src/pdf.py` is only a demo script.
