@@ -4,7 +4,7 @@ from typing import Optional, Literal
 class GeminiConfig(BaseModel):
     engine: Literal["GEMINI"] = Field(default="GEMINI")
     model_name: str = Field(..., description="Gemini model name")
-    gemini_api_key: str = Field(..., min_length=1, description="Google Gemini API key")
+    gemini_api_key: str = Field(..., description="Google Gemini API key")
     gemini_proxy_url: Optional[str] = Field(default=None, description="Optional proxy URL for the Gemini API")
     gemini_fallback_model: Optional[str] = Field(default=None, description="Optional fallback Gemini model")
     gemini_timeout: Optional[float] = Field(default=30, gt=0, description="Model response time limit (in seconds)")
@@ -27,6 +27,6 @@ class GeminiConfig(BaseModel):
     @field_validator('gemini_api_key')
     @classmethod
     def validate_api_key(cls, v):
-        if not v or v.strip() == "":
+        if not v.strip():
             raise ValueError("GEMINI_API_KEY cannot be empty")
         return v.strip()

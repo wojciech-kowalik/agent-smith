@@ -17,9 +17,9 @@ def create_llama_client() -> LLMClient:
     load_dotenv()
     config = LlamaConfig(
         model_name=os.getenv('MODEL_NAME') or os.getenv('LLAMA_MODEL_NAME', 'llama-3.1-8b-instruct'),
-        llama_model_path=os.getenv('LLAMA_MODEL_PATH'),
-        llama_gpu_layers=int(os.getenv('LLAMA_GPU_LAYERS', '1')),
-        llama_context_size=int(os.getenv('LLAMA_CONTEXT_SIZE', '2048'))
+        llama_model_path=os.getenv('LLAMA_MODEL_PATH', ''),
+        llama_gpu_layers=os.getenv('LLAMA_GPU_LAYERS', '1'),
+        llama_context_size=os.getenv('LLAMA_CONTEXT_SIZE', '2048')
     )
     console.print_info(PREPARING_MESSAGE)
     console.print_info(f"Loading LLaMA model from: {config.llama_model_path}")
