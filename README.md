@@ -84,7 +84,7 @@ LLAMA_MODEL_PATH=/path/to/your/model.gguf
 LLAMA_GPU_LAYERS=1       # optional, default 1 (use a high number such as 99 to offload everything to the GPU)
 LLAMA_CONTEXT_SIZE=2048  # optional, default 2048
 ```
-`LLAMA_CONTEXT_SIZE` is also the limit shown by the token counter. A bigger context needs more memory (the KV cache grows with it); if the model fails to load with `Failed to create llama_context`, lower it or reduce `LLAMA_GPU_LAYERS`. For Gemini the counter assumes a 32768-token limit.
+`LLAMA_CONTEXT_SIZE` is also the limit shown by the token counter. When a conversation fills 80% of the context window the app prints a yellow warning after the answer (a stronger one once the limit is exceeded); the history is not trimmed automatically. A bigger context needs more memory (the KV cache grows with it); if the model fails to load with `Failed to create llama_context`, lower it or reduce `LLAMA_GPU_LAYERS`. For Gemini the counter assumes a 32768-token limit.
 
 **Engine selection:** the client is picked from the `ENGINE` variable (case-insensitive): `GEMINI` uses `ChatGoogleGenerativeAI`, `LLAMA_CPP` uses `ChatLlamaCpp` (both created in `src/llm/`).
 

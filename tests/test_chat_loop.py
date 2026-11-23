@@ -61,3 +61,22 @@ def test_speed_line_is_skipped_when_tokens_unknown(run_loop):
     info = run_loop(LLMResponse("answer"))
     assert any(line.startswith("Tokens: 10") for line in info)
     assert not any(line.startswith("Speed:") for line in info)
+
+
+@pytest.mark.parametrize("total, expected", [
+    (79, None),
+    (80, "80%"),
+    (99, "99%"),
+    (100, "exceeds"),
+    (150, "exceeds"),
+])
+def test_context_warning_thresholds(total, expected):
+    warning = chat.context_warning(total, 100)
+    if expected is None:
+        assert warning is None
+    else:
+        assert expected in warning
+
+
+def test_context_warning_ignores_unknown_limit():
+    assert chat.context_warning(10, 0) is None

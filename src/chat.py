@@ -6,6 +6,21 @@ import command_handler
 from cli import console
 from cli.prompt import get_user_input
 
+# Warn when the conversation fills this share of the context window
+CONTEXT_WARNING_RATIO = 0.8
+
+
+def context_warning(total_tokens: int, max_tokens: int) -> str | None:
+    """Returns a warning when the history is close to (or over) the context limit, else None."""
+    if max_tokens <= 0 or total_tokens < max_tokens * CONTEXT_WARNING_RATIO:
+        return None
+    if total_tokens >= max_tokens:
+        return ("Warning: the conversation exceeds the context window; the model may fail or forget "
+                "the beginning. Use /session new to start a fresh conversation.")
+    return (f"Warning: {total_tokens / max_tokens:.0%} of the context window is used. "
+            "Consider starting a new session with /session new.")
+
+
 def init_chat():
     """Initializes a new session or loads an existing one."""
     manager = get_session_manager()
@@ -63,6 +78,9 @@ def main_loop():
             if not streamed:
                 console.print_assistant(f"\n{session.assistant_name}: {response.text}")
             console.print_stats(f"Tokens: {total_tokens} (Remaining: {remaining_tokens} / {max_tokens})")
+            warning = context_warning(total_tokens, max_tokens)
+            if warning:
+                console.print_warning(warning)
             if response.tokens_per_second:
                 console.print_stats(
                     f"Speed: {response.tokens_per_second:.1f} tokens/s "
