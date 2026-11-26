@@ -94,10 +94,12 @@ LLAMA_CONTEXT_SIZE=2048  # optional, default 2048
 ```bash
 ENGINE=LLAMA_CPP
 MODEL_NAME=llama-3.1-8b-instruct
-LLAMA_MODEL_PATH=/Users/tomaszku/Library/Caches/llama.cpp/bartowski_Meta-Llama-3.1-8B-Instruct-GGUF_Meta-Llama-3.1-8B-Instruct-Q8_0.gguf
+LLAMA_MODEL_PATH=/path/to/your/model.gguf
 LLAMA_GPU_LAYERS=1
 LLAMA_CONTEXT_SIZE=2048
 ```
+
+`LLAMA_MODEL_PATH` is a placeholder: point it to a `.gguf` file on your machine (for example a model downloaded by llama.cpp or LM Studio, or one you downloaded yourself from Hugging Face). The path differs between setups, so do not commit your own.
 
 2. Run the application - the llama.cpp engine is used because of `ENGINE=LLAMA_CPP`:
 ```bash
