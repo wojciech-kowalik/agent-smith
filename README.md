@@ -116,7 +116,7 @@ make test                              # or: pip install -r requirements-dev.txt
 
 GitHub Actions (`.github/workflows/tests.yml`) runs them on every push and pull request.
 
-The tests cover the `llm/` layer (history conversion, streaming chat session, token counting, engine selection, Gemini and llama.cpp configuration). They use fake chat models, so they need no API key, network or GGUF file.
+The tests cover the PDF export (code blocks, tables, Polish characters) and the `llm/` layer (history conversion, streaming chat session, token counting, engine selection, Gemini and llama.cpp configuration). They use fake chat models, so they need no API key, network or GGUF file.
 
 ## benchmark
 
@@ -229,7 +229,7 @@ Sessions are stored in `~/.smith/`:
 - `<session-id>-log.json` - conversation history
 - `smith-wal.json` - Write-Ahead Log (all transactions)
 
-Exported PDFs are written to `~/.smith/output/`.
+Exported PDFs are written to `~/.smith/output/`. Code blocks and tables from the answers are rendered too (tables without borders).
 
 ## Troubleshooting
 

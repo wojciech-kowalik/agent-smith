@@ -21,7 +21,7 @@ def generate_pdf_from_markdown(markdown_content, output_filename):
 
     LINE_HEIGHT = 8
     
-    md = Markdown()
+    md = Markdown(extensions=["fenced_code", "tables"])
     html_content = md.convert(markdown_content)
     
     # Using the <font> tag is necessary to set the font correctly after parsing.
