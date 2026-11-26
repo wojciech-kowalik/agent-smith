@@ -229,7 +229,7 @@ Sessions are stored in `~/.smith/`:
 - `<session-id>-log.json` - conversation history
 - `smith-wal.json` - Write-Ahead Log (all transactions)
 
-Exported PDFs are written to `~/.smith/output/`. Code blocks and tables from the answers are rendered too (tables without borders).
+Exported PDFs are written to `~/.smith/output/` by default. Code blocks and tables from the answers are rendered too (tables without borders). Set `SMITH_OUTPUT_DIR` in `.env` (e.g. `SMITH_OUTPUT_DIR=~/Documents/smith`) to use another folder; it is created if missing. This helps when the browser cannot open hidden folders (snap Firefox shows "access denied" for `~/.smith/`).
 
 ## Troubleshooting
 
