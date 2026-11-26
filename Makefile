@@ -4,7 +4,7 @@ STAMP := $(VENV)/.installed
 
 SERVER_LOG := $(HOME)/.smith/server.log
 
-.PHONY: help setup run ask serve stop status test clean
+.PHONY: help setup run ask serve stop status test benchmark clean
 
 help:
 	@echo "make setup               create .venv and install dependencies (+ pytest)"
@@ -15,6 +15,7 @@ help:
 	@echo "make stop                stop the server and release the model from memory"
 	@echo "make status              is the server running?"
 	@echo "make test                run the tests"
+	@echo "make benchmark           time and score the model on a few short tasks (start make serve first)"
 	@echo "make clean               remove .venv"
 
 # Reinstalls only when a requirements file changes
@@ -63,6 +64,9 @@ status: $(STAMP)
 
 test: $(STAMP)
 	$(PYTHON) -m pytest
+
+benchmark: $(STAMP) .env
+	@$(PYTHON) benchmark/bench.py
 
 clean:
 	rm -rf $(VENV)

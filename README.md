@@ -118,6 +118,10 @@ GitHub Actions (`.github/workflows/tests.yml`) runs them on every push and pull 
 
 The tests cover the `llm/` layer (history conversion, streaming chat session, token counting, engine selection, Gemini and llama.cpp configuration). They use fake chat models, so they need no API key, network or GGUF file.
 
+## benchmark
+
+`make benchmark` runs `benchmark/bench.py`: 8 short tasks (arithmetic, knowledge, logic, code, bug finding, regex, translation, a longer text) through `make ask`, printing the time, the answer length and an automatic OK/FAIL per task. Start `make serve` first, otherwise every task also pays the model load time. It is a smoke test, not a quality evaluation.
+
 ## make
 
 ```bash
@@ -128,6 +132,7 @@ make serve               # keep the model loaded in VRAM (make stop releases it)
 make ask "question"      # one-shot: print only the answer (Q="question" also works)
                          #   STDIN=1 adds piped input as context, SESSION_ID=<id> continues a session
 make test                # run the tests
+make benchmark           # time and score the model on 8 short tasks (see below)
 make clean               # remove .venv
 ```
 
