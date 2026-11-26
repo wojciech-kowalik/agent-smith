@@ -4,9 +4,11 @@ Meant for scripts and other tools (e.g. Claude Code): stdout carries just the an
 everything else (model info, errors) goes to stderr, and the exit code tells if it worked.
 """
 import contextlib
+import re
 import sys
 
 import server
+from files import session_files
 from session.chat_session import ChatSession
 from assistant import create_smith_assistant
 
@@ -65,11 +67,21 @@ def run_ask(ask_value: str, session_id: str | None = None, use_stdin: bool = Fal
     return 0
 
 
+SESSION_ID_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
 def open_session(session_id: str | None, llm_client=None) -> ChatSession:
-    """A fresh session, or the saved one. `llm_client` reuses an already loaded model."""
+    """A fresh session, or the one with this ID: it continues the saved history, and an ID that is
+    not saved yet starts a new session under that ID (so every call can pass the same SESSION_ID).
+    A corrupt log file is an error: it must not be overwritten by a new session.
+    `llm_client` reuses an already loaded model."""
     assistant = create_smith_assistant()
     if not session_id:
         return ChatSession(assistant=assistant, llm_client=llm_client)
+    if not SESSION_ID_PATTERN.fullmatch(session_id):
+        raise RuntimeError(f"invalid session ID '{session_id}' (use letters, digits, '.', '_' and '-')")
+    if not session_files.session_exists(session_id):
+        return ChatSession(assistant=assistant, session_id=session_id, llm_client=llm_client)
     session, error = ChatSession.load_from_file(assistant=assistant, session_id=session_id, llm_client=llm_client)
     if error:
         raise RuntimeError(error)

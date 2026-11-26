@@ -4,6 +4,11 @@ from datetime import datetime
 from typing import List, Any, Dict
 from files.config import LOG_DIR
 
+def session_exists(session_id: str) -> bool:
+    """True when a log file for this session ID is saved."""
+    return os.path.exists(os.path.join(LOG_DIR, f"{session_id}-log.json"))
+
+
 def load_session_history(session_id: str) -> tuple[List[Dict], str | None]:
     """
     Loads session history from a JSON file in universal format.

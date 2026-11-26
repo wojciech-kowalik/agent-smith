@@ -105,3 +105,58 @@ def test_failure_goes_to_stderr_with_nonzero_exit(monkeypatch, capsys):
     out, err = capsys.readouterr()
     assert out == ""
     assert "model down" in err
+
+
+# ---- sessions: SESSION_ID continues the history, a new ID starts a session under that ID ------
+
+@pytest.fixture
+def real_open_session(monkeypatch):
+    monkeypatch.setattr(ask, "create_smith_assistant", lambda: object())
+    created = []
+
+    class FakeChatSession:
+        def __init__(self, assistant, session_id=None, history=None, llm_client=None):
+            self.session_id = session_id or "generated"
+            created.append(self)
+
+        @classmethod
+        def load_from_file(cls, assistant, session_id, llm_client=None):
+            return cls(assistant, session_id), None
+
+    monkeypatch.setattr(ask, "ChatSession", FakeChatSession)
+    return created
+
+
+def test_unknown_session_id_starts_a_new_session_under_that_id(real_open_session, monkeypatch):
+    monkeypatch.setattr(ask.session_files, "session_exists", lambda sid: False)
+    assert ask.open_session("my-topic").session_id == "my-topic"
+
+
+def test_known_session_id_loads_the_saved_history(real_open_session, monkeypatch):
+    monkeypatch.setattr(ask.session_files, "session_exists", lambda sid: True)
+    loaded = []
+
+    def load_from_file(cls, assistant, session_id, llm_client=None):
+        loaded.append(session_id)
+        return cls(assistant, session_id), None
+
+    monkeypatch.setattr(ask.ChatSession, "load_from_file", classmethod(load_from_file))
+    assert ask.open_session("my-topic").session_id == "my-topic"
+    assert loaded == ["my-topic"]
+
+
+def test_corrupt_session_file_is_an_error_not_overwritten(real_open_session, monkeypatch):
+    monkeypatch.setattr(ask.session_files, "session_exists", lambda sid: True)
+    monkeypatch.setattr(ask.ChatSession, "load_from_file",
+                        classmethod(lambda cls, assistant, session_id, llm_client=None: (None, "Cannot decode log file")))
+    with pytest.raises(RuntimeError, match="Cannot decode"):
+        ask.open_session("broken")
+
+
+@pytest.mark.parametrize("bad", ["../escape", "a/b", "", ".hidden", "with space"])
+def test_invalid_session_ids_are_rejected(real_open_session, bad):
+    if bad == "":
+        assert ask.open_session("").session_id == "generated"  # empty means no session
+    else:
+        with pytest.raises(RuntimeError, match="invalid session ID"):
+            ask.open_session(bad)

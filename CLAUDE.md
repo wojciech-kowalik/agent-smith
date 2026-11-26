@@ -57,7 +57,7 @@ git diff | make --no-print-directory -C <path-to-agent-smith> ask "Review this d
 ```
 
 - Quote the question (a question that is exactly a make target name, e.g. `test`, would run that target; use `Q=` then); add `STDIN=1` only when piping context (stdin is not read otherwise, so it never hangs).
-- Stateless by default; `SESSION_ID=<id>` continues and saves a session.
+- Stateless by default. Pass the same `SESSION_ID=<id>` on every call to keep one conversation: a new ID creates the session, later calls continue its history (works with and without the server). Use a short ID like `review-pr-12` (letters, digits, `.`, `_`, `-`); mind the 8192-token context for long sessions.
 - The model runs fully in VRAM (`LLAMA_GPU_LAYERS=99`, context 8192): if loading fails with a GPU memory error, another program (LM Studio) holds the VRAM - unload it with `~/.lmstudio/bin/lms unload qwen2.5-coder-14b-instruct`. Do not lower the GPU layers.
 - Keep the input within the 8192-token context.
 - Without the server every call loads the model (a few seconds, ~9 GB VRAM) and frees it on exit; parallel calls then fail with a GPU memory error. For several questions or parallel callers start the server first: `make --no-print-directory -C <path-to-agent-smith> serve` (model stays in VRAM, answers in ~1 s, parallel calls are queued, `make ask` uses it automatically).
