@@ -122,6 +122,9 @@ The tests cover the `llm/` layer (history conversion, streaming chat session, to
 make setup               # create .venv and install dependencies
 make run                 # start Agent Smith (creates .env from .env.example if missing)
 make run SESSION_ID=<id> # resume a session
+make serve               # keep the model loaded in VRAM (make stop releases it)
+make ask "question"      # one-shot: print only the answer (Q="question" also works)
+                         #   STDIN=1 adds piped input as context, SESSION_ID=<id> continues a session
 make test                # run the tests
 make clean               # remove .venv
 ```
@@ -130,6 +133,42 @@ make clean               # remove .venv
 
 - run: `make run` (or activate the venv with `source .venv/bin/activate` and run `python src/run.py`)
 - resume a session: `make run SESSION_ID=<ID>` (or `python src/run.py --session-id=<ID>`)
+
+### One-shot mode (`--ask`)
+
+Besides the interactive chat, Smith can answer a single question and exit - handy as a helper for scripts or other tools such as Claude Code:
+
+```bash
+python src/run.py --ask "How do I reverse a list in Python?"
+git diff | python src/run.py --ask "Review this diff" --stdin   # --stdin: piped text is added as context
+echo "What does this error mean?" | python src/run.py -p   # no argument: the question comes from stdin
+python src/run.py --ask "And in Rust?" --session-id=<ID>   # continue (and save to) an existing session
+git diff | make ask "Review this diff" STDIN=1         # the same through make
+```
+
+- stdin is read only with `--stdin` or when the question is `-`/missing, so a caller holding an idle pipe open (e.g. Claude Code) never hangs.
+- stdout contains **only the answer**; model info and errors go to stderr, so the output is safe to capture.
+- Exit code: `0` answered, `1` model/session error, `2` empty question.
+- Nothing is saved to `~/.smith/` unless `--session-id` is given (the WAL still logs the exchange).
+- Only the answer is returned (no streaming, progress bar or token stats). Without the server (below) the model is loaded on every call, so a local GGUF model takes a few seconds to start.
+
+### Keeping the model loaded (`make serve` / `make stop`)
+
+```bash
+make serve    # load the model once and keep it in VRAM (in the background; log: ~/.smith/server.log)
+make ask "question"   # now answers in about a second - it uses the server automatically
+make status   # is the server running?
+make stop     # stop the server and release the model from memory
+```
+
+(`python src/run.py --serve | --stop | --status` do the same.)
+
+- The model stays in memory until you run `make stop` (or kill the process) - it is never unloaded automatically. It holds the VRAM (about 10 GB for the 14B model), so stop it when you want the GPU for something else, e.g. LM Studio.
+- Parallel callers are safe: one model has one context, so requests are answered one at a time and the rest wait in a queue. Without the server, parallel `--ask` calls each try to load their own copy of the model and fail when the VRAM is not enough.
+- `--ask` falls back to loading the model itself when the server is not running. Answers served by the server print a reminder on stderr to stop it when you are done.
+- The server listens on a Unix socket in `~/.smith/` (`smith.sock`), so only your user can reach it.
+
+To let Claude Code use it, add a note like this to your project's `CLAUDE.md`: *"For a second opinion from the local model run `python /path/to/agent-smith/src/run.py --ask "<question>"` (pipe context on stdin with `--stdin`)."*
 
 After you send a prompt, an animated progress bar with elapsed time is shown while Smith waits for the model's answer. It is skipped when output is not a terminal (e.g. piped).
 
@@ -163,7 +202,7 @@ Exported PDFs are written to `~/.smith/output/`.
 - Something looks wrong? Inspect the files in `~/.smith/` and check your `.env`.
 - `404 NOT_FOUND` from Gemini: the model name in `MODEL_NAME` is not available for your key (models get retired). List the models your key can use at https://aistudio.google.com.
 - `503 UNAVAILABLE`: the model is overloaded. Smith retries automatically; set `GEMINI_FALLBACK_MODEL` to switch to another model when it keeps failing.
-- `Failed to create llama_context` / `Failed to load model` with LLaMA: not enough memory for the model plus the context. Lower `LLAMA_CONTEXT_SIZE` or `LLAMA_GPU_LAYERS`, or close other programs using the GPU.
+- `Failed to create llama_context` / `Failed to load model` with LLaMA: not enough memory for the model plus the context. Lower `LLAMA_CONTEXT_SIZE` or `LLAMA_GPU_LAYERS`, or close other programs using the GPU (check with `nvidia-smi`; LM Studio's server keeps the model in VRAM while it runs). `LLAMA_GPU_LAYERS=0` runs on the CPU only: slower, but needs no VRAM.
 - If a request fails, the chat stays open and you can just send the message again.
 
 ## Project layout
@@ -171,6 +210,8 @@ Exported PDFs are written to `~/.smith/output/`.
 ```
 src/
   run.py, chat.py        entry point and main loop
+  ask.py                 one-shot mode (--ask)
+  server.py              optional server that keeps the model loaded (--serve, --stop, --status)
   cli/                   prompt, console output, CLI arguments
   command_handler.py     slash commands (implementations in commands/)
   session/               SessionManager and ChatSession

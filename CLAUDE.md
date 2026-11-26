@@ -10,6 +10,7 @@ Use the `Makefile` (it manages `.venv`, installs `requirements-dev.txt` once and
 make setup                # create .venv, install dependencies (+ pytest)
 make run                  # new session
 make run SESSION_ID=<id>  # resume a session
+make ask "question"       # one-shot: only the answer on stdout (Q="question" also works) (STDIN=1, SESSION_ID=<id> optional)
 make test                 # run the tests
 make clean                # remove .venv
 ```
@@ -27,6 +28,8 @@ Manual equivalent: `python -m venv .venv && source .venv/bin/activate && pip ins
 Flow: prompt_toolkit UI → command handler → session manager → chat session → LLM client → model (API or GGUF).
 
 - `src/run.py` → `src/chat.py`: entry point and main loop (UI in `src/cli/`: `args.py`, `console.py`, `prompt.py`).
+- `src/ask.py`: one-shot mode (`--ask`/`-p`): answer only on stdout, everything else on stderr, no save without `--session-id`.
+- `src/server.py`: optional model server (`--serve`/`--stop`/`--status`, `make serve|stop|status`): one process keeps the model in VRAM and answers over a Unix socket (`~/.smith/smith.sock`, log `~/.smith/server.log`); requests are queued (one generation at a time); `--ask` uses it when running, otherwise loads the model itself.
 - `src/command_handler.py` + `src/commands/`: slash commands. New commands follow the existing pattern in `commands/`.
 - `src/session/`: `session_manager.py` (session lifecycle and active session), `chat_session.py` (one conversation's history and state).
 - `src/llm/`: LangChain-based. `client.py` (`LLMClient`), `chat_session.py` (streaming session), `history.py`, `factory.py` (engine from `ENGINE`), engines `gemini.py` and `llama.py` with `*_validation.py`. `send_message` returns an `LLMResponse` (`text`, `output_tokens`, `tokens_per_second`); `chat.py` prints the speed line after each answer. The `Tokens`/`Speed` lines use `console.print_stats`, colored with `PROMPT_TEXT_COLOR` (shared with the prompt style).
@@ -43,6 +46,22 @@ Flow: prompt_toolkit UI → command handler → session manager → chat session
 /help
 /exit, /quit
 ```
+
+## Calling Smith from another agent (e.g. Claude Code)
+
+One-shot mode returns only the answer on stdout (logs go to stderr, exit code 0 = OK). Use it for a second opinion from the local model:
+
+```bash
+make --no-print-directory -C <path-to-agent-smith> ask "<question>" 2>/dev/null
+git diff | make --no-print-directory -C <path-to-agent-smith> ask "Review this diff" STDIN=1 2>/dev/null
+```
+
+- Quote the question (a question that is exactly a make target name, e.g. `test`, would run that target; use `Q=` then); add `STDIN=1` only when piping context (stdin is not read otherwise, so it never hangs).
+- Stateless by default; `SESSION_ID=<id>` continues and saves a session.
+- The model runs fully in VRAM (`LLAMA_GPU_LAYERS=99`, context 8192): if loading fails with a GPU memory error, another program (LM Studio) holds the VRAM - unload it with `~/.lmstudio/bin/lms unload qwen2.5-coder-14b-instruct`. Do not lower the GPU layers.
+- Keep the input within the 8192-token context.
+- Without the server every call loads the model (a few seconds, ~9 GB VRAM) and frees it on exit; parallel calls then fail with a GPU memory error. For several questions or parallel callers start the server first: `make --no-print-directory -C <path-to-agent-smith> serve` (model stays in VRAM, answers in ~1 s, parallel calls are queued, `make ask` uses it automatically).
+- **Reminder for the managing agent: the server holds ~10 GB of VRAM until it is stopped. When the session with Smith is over, release the model with `make --no-print-directory -C <path-to-agent-smith> stop`** (check with `make status`). Stop it earlier when the user wants the GPU for something else (e.g. LM Studio). Every `make ask` answered by the server prints this reminder on stderr.
 
 ## Data & debugging
 

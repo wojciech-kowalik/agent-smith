@@ -38,7 +38,12 @@ def create_llama_client() -> LLMClient:
         )
     except Exception as e:
         console.print_error(f"LLaMA model initialization error: {e}")
-        raise RuntimeError(f"Failed to initialize LLaMA model: {e}")
+        hint = ""
+        if str(config.llama_gpu_layers) != "0":
+            hint = (" Hint: the model may not fit in free GPU memory (another program, e.g. LM Studio or "
+                    "Ollama, can be holding it): close it, or lower LLAMA_GPU_LAYERS (0 = CPU only) "
+                    "or LLAMA_CONTEXT_SIZE.")
+        raise RuntimeError(f"Failed to initialize LLaMA model: {e}{hint}")
 
     def count_tokens(messages) -> int:
         # The model's own tokenizer (the generic LangChain counter would need `transformers`)

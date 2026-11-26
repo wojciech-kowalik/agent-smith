@@ -13,7 +13,8 @@ class ChatSession:
     Encapsulates session ID, conversation history, assistant, and LLM chat session.
     """
     
-    def __init__(self, assistant: Assistant, session_id: str | None = None, history: List[Any] | None = None):
+    def __init__(self, assistant: Assistant, session_id: str | None = None, history: List[Any] | None = None,
+                 llm_client: LLMClient | None = None):
         """
         Initialize a chat session.
         
@@ -21,11 +22,13 @@ class ChatSession:
             assistant: Assistant instance that defines the behavior and model for this session
             session_id: Unique session identifier. If None, generates a new UUID.
             history: Initial conversation history. If None, starts empty.
+            llm_client: Already loaded client to reuse (the server shares one model between requests).
+            If None, a client is created (and the model loaded) from the environment.
         """
         self.assistant = assistant
         self.session_id = session_id or str(uuid.uuid4())
         self._history = history or []
-        self._llm_client: LLMClient | None = None
+        self._llm_client: LLMClient | None = llm_client
         self._llm_chat_session = None
         self._max_context_tokens = 32768
         self._initialize_llm_session()
@@ -39,10 +42,10 @@ class ChatSession:
         if self._llm_client is None:
             self._llm_client = create_llm_client()
             console.print_info(self._llm_client.ready_for_use_message())
-            # Local models report their real context window (e.g. LLAMA_CONTEXT_SIZE)
-            context_size = self._llm_client.get_context_size()
-            if context_size:
-                self._max_context_tokens = context_size
+        # Local models report their real context window (e.g. LLAMA_CONTEXT_SIZE)
+        context_size = self._llm_client.get_context_size()
+        if context_size:
+            self._max_context_tokens = context_size
         
         self._llm_chat_session = self._llm_client.create_chat_session(
             system_instruction=self.assistant.system_prompt,
@@ -51,7 +54,8 @@ class ChatSession:
     
     
     @classmethod
-    def load_from_file(cls, assistant: Assistant, session_id: str) -> tuple['ChatSession | None', str | None]:
+    def load_from_file(cls, assistant: Assistant, session_id: str,
+                       llm_client: LLMClient | None = None) -> tuple['ChatSession | None', str | None]:
         """
         Loads a session from disk.
         
@@ -67,7 +71,7 @@ class ChatSession:
         if error:
             return None, error
         
-        session = cls(assistant=assistant, session_id=session_id, history=history)
+        session = cls(assistant=assistant, session_id=session_id, history=history, llm_client=llm_client)
         return session, None
     
     def save_to_file(self) -> tuple[bool, str | None]:
