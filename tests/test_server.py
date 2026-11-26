@@ -50,7 +50,9 @@ def test_no_server_means_no_reply(tmp_path):
 
 def test_status_and_question(running_server):
     path, _ = running_server
-    assert server.request({"cmd": "status"}, path) == {"ok": True, "model": "fake-model", "busy": False}
+    reply = server.request({"cmd": "status"}, path)
+    assert (reply["ok"], reply["model"], reply["busy"]) == (True, "fake-model", False)
+    assert reply["gpu"]  # GPU lines (or the "not available" note)
     assert server.request({"question": "hi"}, path) == {"text": "answer:hi"}
 
 
@@ -101,3 +103,20 @@ def test_ask_reports_server_errors(monkeypatch, capsys):
     assert ask.run_ask("hello") == 1
     out, err = capsys.readouterr()
     assert out == "" and "boom" in err
+
+
+def test_stop_reports_released_vram(monkeypatch, capsys):
+    replies = iter([{"ok": True, "pid": 4242, "held_mib": 9700}, {"ok": True}])
+    monkeypatch.setattr(server, "request", lambda payload, path=None: next(replies))
+    monkeypatch.setattr(server, "_wait_for_exit", lambda pid, timeout=60.0: True)
+    monkeypatch.setattr(server, "gpu_report", lambda pid=None, run=None: ["GPU 0: card | VRAM total 1 MiB, used 0 MiB, free 1 MiB"])
+    assert server.stop() == 0
+    out = capsys.readouterr().out
+    assert "GPU 0: card" in out
+    assert "released 9700 MiB of VRAM" in out
+
+
+def test_stop_without_server_does_nothing(monkeypatch, capsys):
+    monkeypatch.setattr(server, "request", lambda payload, path=None: None)
+    assert server.stop() == 0
+    assert "nothing to stop" in capsys.readouterr().out

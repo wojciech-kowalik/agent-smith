@@ -50,7 +50,7 @@ serve: $(STAMP) .env
 	mkdir -p $(dir $(SERVER_LOG)); \
 	setsid nohup $(PYTHON) src/run.py --serve > $(SERVER_LOG) 2>&1 < /dev/null & \
 	for i in $$(seq 1 180); do \
-		$(PYTHON) src/run.py --status >/dev/null 2>&1 && { echo "The Smith server is ready (model loaded)."; exit 0; }; \
+		$(PYTHON) src/run.py --status >/dev/null 2>&1 && { echo "The Smith server is ready (model loaded)."; $(PYTHON) src/run.py --status; exit 0; }; \
 		sleep 1; \
 	done; \
 	echo "The Smith server did not start; see $(SERVER_LOG)" >&2; exit 1

@@ -14,8 +14,10 @@ import socket
 import socketserver
 import sys
 import threading
+import time
 
 from files.config import LOG_DIR
+from gpu import gpu_report, memory_label, process_memory_mib
 
 SOCKET_PATH = os.path.join(LOG_DIR, 'smith.sock')
 
@@ -48,7 +50,9 @@ class SmithServer(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
     def handle_payload(self, payload: dict) -> dict:
         command = payload.get("cmd")
         if command == "status":
-            return {"ok": True, "model": self.llm_client.get_model_name(), "busy": self.inference_lock.locked()}
+            return {"ok": True, "model": self.llm_client.get_model_name(), "busy": self.inference_lock.locked(),
+                    "gpu": gpu_report(os.getpid()), "pid": os.getpid(),
+                    "held_mib": process_memory_mib(os.getpid())}
         if command == "stop":
             with self.inference_lock:  # let a running generation finish first
                 threading.Thread(target=self.shutdown, daemon=True).start()
@@ -88,6 +92,8 @@ def serve(path: str = SOCKET_PATH) -> int:
     from llm import create_llm_client
     client = create_llm_client()
     print(client.ready_for_use_message(), flush=True)
+    for line in gpu_report(os.getpid()):  # measured after loading: shows what the model took
+        print(line, flush=True)
 
     server = SmithServer(path, client)
     signal.signal(signal.SIGTERM, lambda *_: threading.Thread(target=server.shutdown, daemon=True).start())
@@ -109,12 +115,35 @@ def status(path: str = SOCKET_PATH) -> int:
         print("The Smith server is not running (the model is not held in memory).")
         return 1
     print(f"The Smith server is running (model: {reply['model']}, {'busy' if reply['busy'] else 'idle'}).")
+    for line in reply.get("gpu", []):
+        print(line)
     return 0
 
 
+def _wait_for_exit(pid: int, timeout: float = 60.0) -> bool:
+    """True once the process `pid` is gone (its VRAM is released only then)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return True
+        time.sleep(0.2)
+    return False
+
+
 def stop(path: str = SOCKET_PATH) -> int:
-    if request({"cmd": "stop"}, path) is None:
+    before = request({"cmd": "status"}, path)
+    if before is None or request({"cmd": "stop"}, path) is None:
         print("The Smith server is not running; nothing to stop.")
         return 0
     print("The Smith server is stopping; the model will be released from memory.")
+    if not _wait_for_exit(before["pid"]):
+        print(f"Warning: the server (pid {before['pid']}) is still running after 60 s.", file=sys.stderr)
+        return 1
+    print("The Smith server stopped; the model is released from memory.")
+    for line in gpu_report():
+        print(line)
+    if before.get("held_mib"):
+        print(f"Smith (pid {before['pid']}) released {before['held_mib']} MiB of {memory_label()}")
     return 0

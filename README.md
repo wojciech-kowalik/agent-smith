@@ -165,6 +165,33 @@ make stop     # stop the server and release the model from memory
 
 (`python src/run.py --serve | --stop | --status` do the same.)
 
+On start (in `~/.smith/server.log`) and in `make status` the server reports the GPU and its memory (`src/gpu.py`):
+
+```
+GPU 0: NVIDIA GeForce RTX 3060 | VRAM total 12288 MiB, used 10394 MiB, free 1516 MiB
+Smith (pid 28073) holds 9802 MiB of VRAM
+```
+
+On **macOS** the GPU shares the system memory (unified memory, Metal), so there is no separate VRAM: the report shows the chip, the total/used/free system memory (`sysctl`, `vm_stat`) and the memory the Smith process uses (its resident set, `ps`):
+
+```
+GPU 0: Apple M2 Pro (19 GPU cores) | unified memory (shared with the system) total 32768 MiB, used 27300 MiB, free 5468 MiB
+Smith (pid 4242) holds 9600 MiB of unified memory
+```
+
+| Platform | Source | Shown |
+|---|---|---|
+| Linux + NVIDIA | `nvidia-smi` | card model, VRAM total/used/free, VRAM held by Smith |
+| macOS (Apple Silicon / Intel) | `system_profiler`, `sysctl`, `vm_stat`, `ps` | chip, unified memory total/used/free, memory used by Smith |
+| anything else (e.g. AMD on Linux) | - | a note that no GPU information is available |
+
+`make stop` waits until the server process is gone and then shows the GPU again, with how much VRAM was released:
+
+```
+GPU 0: NVIDIA GeForce RTX 3060 | VRAM total 12288 MiB, used 582 MiB, free 11328 MiB
+Smith (pid 28331) released 9802 MiB of VRAM
+```
+
 - The model stays in memory until you run `make stop` (or kill the process) - it is never unloaded automatically. It holds the VRAM (about 10 GB for the 14B model), so stop it when you want the GPU for something else, e.g. LM Studio.
 - Parallel callers are safe: one model has one context, so requests are answered one at a time and the rest wait in a queue. Without the server, parallel `--ask` calls each try to load their own copy of the model and fail when the VRAM is not enough.
 - `--ask` falls back to loading the model itself when the server is not running. Answers served by the server print a reminder on stderr to stop it when you are done.
@@ -214,6 +241,7 @@ src/
   run.py, chat.py        entry point and main loop
   ask.py                 one-shot mode (--ask)
   server.py              optional server that keeps the model loaded (--serve, --stop, --status)
+  gpu.py                 GPU / memory report for the server (nvidia-smi on Linux, sysctl/vm_stat on macOS)
   cli/                   prompt, console output, CLI arguments
   command_handler.py     slash commands (implementations in commands/)
   session/               SessionManager and ChatSession
